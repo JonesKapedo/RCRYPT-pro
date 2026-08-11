@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+  rockycrypt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rockycrypt-app
+    environment:
+      ROCKYCRYPT_PRODUCTION: "${ROCKYCRYPT_PRODUCTION:-false}"
+      ROCKYCRYPT_ADMIN_SECRET: "${ROCKYCRYPT_ADMIN_SECRET}"
+      ROCKYCRYPT_JWT_SECRET: "${ROCKYCRYPT_JWT_SECRET}"
+      ROCKYCRYPT_HOST: "0.0.0.0"
+      ROCKYCRYPT_PORT: "8000"
+      ROCKYCRYPT_CORS_ORIGINS: "${ROCKYCRYPT_CORS_ORIGINS:-http://localhost:8000,http://127.0.0.1:8000}"
+      ROCKYCRYPT_SMTP_HOST: "${ROCKYCRYPT_SMTP_HOST:-smtp.gmail.com}"
+      ROCKYCRYPT_SMTP_PORT: "${ROCKYCRYPT_SMTP_PORT:-587}"
+      ROCKYCRYPT_SMTP_USER: "${ROCKYCRYPT_SMTP_USER}"
+      ROCKYCRYPT_SMTP_PASS: "${ROCKYCRYPT_SMTP_PASS}"
+      PAYSTACK_PUBLIC_KEY: "${PAYSTACK_PUBLIC_KEY}"
+      PAYSTACK_SECRET_KEY: "${PAYSTACK_SECRET_KEY}"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - rockycrypt-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/market-status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    container_name: rockycrypt-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./rockycrypt_v2.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      - rockycrypt
+    networks:
+      - rockycrypt-net
+    restart: unless-stopped
+
+networks:
+  rockycrypt-net:
+    driver: bridge

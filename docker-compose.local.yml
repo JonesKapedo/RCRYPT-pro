@@ -1,0 +1,44 @@
+# RockyCrypt — Local Docker pilot (Docker + ngrok)
+# -------------------------------------------------
+# Backend-only single container. No nginx / SSL needed here because ngrok
+# terminates HTTPS on its own public URL and forwards to this host port.
+#
+# The FastAPI app serves BOTH the single-file frontend (/) and the API (/api).
+#
+# Start:
+#   docker compose -f docker-compose.local.yml up -d --build
+#
+# Expose publicly:
+#   ngrok http 8080
+#
+# Stop:
+#   docker compose -f docker-compose.local.yml down
+name: rockycrypt-local
+
+services:
+  rockycrypt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rockycrypt-app
+    env_file:
+      - .env.production
+    environment:
+      ROCKYCRYPT_HOST: "0.0.0.0"
+      ROCKYCRYPT_PORT: "8000"
+      # Trust proxy headers (X-Forwarded-Proto / X-Forwarded-For) from ngrok.
+      # Required so the app sees "https" behind the ngrok tunnel (admin login
+      # is HTTP-only blocked in production mode otherwise).
+      FORWARDED_ALLOW_IPS: "*"
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/market-status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
